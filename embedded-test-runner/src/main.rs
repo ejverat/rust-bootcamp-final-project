@@ -13,7 +13,6 @@ use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
 
 use embedded_alloc::LlffHeap as Heap;
-use testing::ExecutableTest;
 
 extern crate alloc;
 
@@ -23,47 +22,52 @@ static HEAP: Heap = Heap::empty();
 pub mod testing {
     use core::fmt::Debug;
 
-    use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
+    use alloc::{borrow::ToOwned, boxed::Box, format, string::String, vec::Vec};
     use cortex_m_semihosting::hprintln;
 
-    pub trait ExecutableTest {
-        fn execute(&mut self);
-        fn assert<F: Fn() -> bool + 'static>(&mut self, f: F);
-        fn get_result(&self) -> bool;
+    pub struct TestInfo {
+        title: String,
+        function: Box<dyn Fn() -> String + 'static>,
+        expected: String,
     }
 
-    pub struct TestItem {
-        pub title: String,
-        pub function: Box<dyn Fn() -> bool>,
+    #[derive(Debug)]
+    pub struct TestResult {
+        title: String,
+        test_result: String,
+        expected: String,
         passed: bool,
     }
 
-    impl Debug for TestItem {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.debug_struct("TestItem")
-                .field("title", &self.title)
-                .field("function", &"Fn()".to_owned())
-                .field("result", &self.passed)
-                .finish()
-        }
-    }
-
-    impl ExecutableTest for TestItem {
-        fn execute(&mut self) {
-            self.passed = self.function.as_ref()();
-        }
-
-        fn assert<F: Fn() -> bool + 'static>(&mut self, f: F) {
-            self.function = Box::new(f);
-        }
-
-        fn get_result(&self) -> bool {
-            self.passed
-        }
-    }
-
     pub struct Runner {
-        tests: Vec<TestItem>,
+        tests: Vec<TestInfo>,
+    }
+
+    pub struct TestBuilder<'a> {
+        runner: &'a mut Runner,
+        title: String,
+    }
+
+    impl<'a> TestBuilder<'a> {
+        pub fn new(runner: &'a mut Runner, title: &str) -> Self {
+            TestBuilder {
+                runner,
+                title: title.to_owned(),
+            }
+        }
+
+        pub fn assert_eq<F, T>(&mut self, f: F, value: &T)
+        where
+            F: Fn() -> T + 'static,
+            T: Debug + PartialEq,
+        {
+            let test_info = TestInfo {
+                title: self.title.to_owned(),
+                function: Box::new(move || format!("{:?}", f())),
+                expected: format!("{:?}", value),
+            };
+            self.runner.tests.push(test_info);
+        }
     }
 
     impl Runner {
@@ -71,21 +75,25 @@ pub mod testing {
             Self { tests: Vec::new() }
         }
 
-        pub fn test(&mut self, title: &str) -> &mut TestItem {
-            let new_test = TestItem {
-                title: title.to_owned(),
-                function: Box::new(|| false),
-                passed: false,
-            };
-            self.tests.push(new_test);
-            self.tests.last_mut().unwrap()
+        pub fn test(&mut self, title: &str) -> TestBuilder {
+            TestBuilder::new(self, title)
         }
 
-        pub fn run(&mut self) {
+        pub fn run(&mut self) -> Vec<TestResult> {
+            let mut tests_results: Vec<TestResult> = Vec::new();
             for t in &mut self.tests {
-                t.execute();
-                hprintln!("{:?}", t);
+                let result = t.function.as_ref()();
+                let test_result = TestResult {
+                    title: t.title.to_owned(),
+                    test_result: result.to_owned(),
+                    expected: t.expected.to_owned(),
+                    passed: t.expected == result,
+                };
+
+                tests_results.push(test_result);
             }
+
+            tests_results
         }
     }
 
@@ -94,6 +102,38 @@ pub mod testing {
             Self::new()
         }
     }
+
+    pub fn report_test(test_results: &Vec<TestResult>) {
+        let num_failed_tests = test_results
+            .iter()
+            .filter(|t| t.passed == false)
+            .map(|ft| {
+                hprintln!("{}: FAILED", ft.title);
+                hprintln!("EXPECTED: {}", ft.expected);
+                hprintln!("RESULT:   {}", ft.test_result);
+            })
+            .count();
+
+        if num_failed_tests == 0 {
+            hprintln!("ALL TEST PASSED");
+        } else {
+            hprintln!(
+                "PASSED: {} - FAILED: {}",
+                test_results.len() - num_failed_tests,
+                num_failed_tests
+            );
+        }
+    }
+
+    pub fn report_test_debug(test_results: &Vec<TestResult>) {
+        for result in test_results {
+            hprintln!("{:?}", result);
+        }
+    }
+}
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
 }
 
 #[entry]
@@ -108,18 +148,15 @@ fn main() -> ! {
 
     let mut test_runner = testing::Runner::new();
 
-    test_runner.test("First").assert(|| {
-        hprintln!("Inside closure");
+    test_runner
+        .test("Passing test")
+        .assert_eq(|| add(5, 5), &10);
 
-        6 == 5
-    });
+    test_runner.test("Failing test").assert_eq(|| add(3, 3), &7);
 
-    test_runner.test("Second").assert(|| {
-        hprintln!("Inside second closure");
-        true
-    });
+    let test_results = test_runner.run();
 
-    test_runner.run();
+    testing::report_test(&test_results);
 
     debug::exit(debug::EXIT_SUCCESS);
 
