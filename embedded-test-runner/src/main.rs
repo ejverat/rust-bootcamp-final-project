@@ -3,7 +3,6 @@
 
 use core::mem::MaybeUninit;
 
-use alloc::borrow::ToOwned;
 // pick a panicking behavior
 use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
                      // use panic_abort as _; // requires nightly
@@ -15,58 +14,16 @@ use cortex_m_semihosting::{debug, hprintln};
 
 use embedded_alloc::LlffHeap as Heap;
 use testing::ExecutableTest;
-// use heapless;
-//
+
 extern crate alloc;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
-// pub mod tests {
-//     use alloc::{
-//         borrow::ToOwned,
-//         boxed::Box,
-//         collections::btree_map::BTreeMap,
-//         rc::Rc,
-//         string::{String, ToString},
-//         vec::{self, Vec},
-//     };
-//     use cortex_m_semihosting::hprintln;
-//
-//     pub fn describe(title: &str, handler: impl Fn()) {
-//         hprintln!("{}", title);
-//         TESTS_MAP.insert(key, value)
-//         handler();
-//     }
-//
-//     pub fn it(title: &str, handler: impl Fn()) {
-//         hprintln!("{}", title);
-//         handler();
-//     }
-//
-//     enum TestType {
-//         Suite,
-//         Test(Rc<dyn Fn() + 'static>),
-//     }
-//
-//     struct TestInfo {
-//         title: String,
-//         test_type: TestType,
-//     }
-//
-//     static mut TESTS_MAP: BTreeMap<String, TestInfo> = BTreeMap::new();
-// }
-
 pub mod testing {
-    use core::{cell::RefCell, fmt::Debug};
+    use core::fmt::Debug;
 
-    use alloc::{
-        borrow::ToOwned,
-        boxed::Box,
-        rc::{Rc, Weak},
-        string::String,
-        vec::Vec,
-    };
+    use alloc::{borrow::ToOwned, boxed::Box, string::String, vec::Vec};
     use cortex_m_semihosting::hprintln;
 
     pub trait ExecutableTest {
@@ -163,19 +120,6 @@ fn main() -> ! {
     });
 
     test_runner.run();
-
-    // tests::describe("First", || {
-    //     tests::describe("Second", || {
-    //         tests::it("Test", || {
-    //             hprintln!("Test execution");
-    //         });
-    //     });
-    //     tests::describe("Third", || {
-    //         tests::it("Test 2", || {
-    //             hprintln!("Second test");
-    //         });
-    //     });
-    // });
 
     debug::exit(debug::EXIT_SUCCESS);
 
