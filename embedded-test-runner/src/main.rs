@@ -27,7 +27,7 @@ pub mod testing {
 
     pub struct TestInfo {
         title: String,
-        function: Box<dyn Fn() -> String + 'static>,
+        function: Box<dyn Fn() -> (String, bool) + 'static>,
         expected: String,
     }
 
@@ -70,17 +70,38 @@ pub mod testing {
             }
         }
 
-        pub fn assert_eq<F, T>(&mut self, f: F, value: &T)
+        pub fn assert<F, G, T>(&mut self, f: F, validator: G, value: &'static T)
         where
             F: Fn() -> T + 'static,
+            G: Fn(&T, &T) -> bool + 'static,
             T: Debug + PartialEq,
         {
             let test_info = TestInfo {
                 title: self.title.to_owned(),
-                function: Box::new(move || format!("{:?}", f())),
+                function: Box::new(move || {
+                    let result = f();
+                    let compare_result = validator(&result, value);
+                    (format!("{:?}", result), compare_result)
+                }),
                 expected: format!("{:?}", value),
             };
             self.runner.tests.push(test_info);
+        }
+
+        pub fn assert_eq<F, T>(&mut self, f: F, value: &'static T)
+        where
+            F: Fn() -> T + 'static,
+            T: Debug + PartialEq,
+        {
+            self.assert(f, |x, y| x == y, value);
+        }
+
+        pub fn assert_neq<F, T>(&mut self, f: F, value: &'static T)
+        where
+            F: Fn() -> T + 'static,
+            T: Debug + PartialEq,
+        {
+            self.assert(f, |x, y| x != y, value);
         }
     }
 
@@ -99,9 +120,9 @@ pub mod testing {
                 let result = t.function.as_ref()();
                 let test_result = TestResult {
                     title: t.title.to_owned(),
-                    test_result: result.to_owned(),
+                    test_result: result.0,
                     expected: t.expected.to_owned(),
-                    passed: t.expected == result,
+                    passed: result.1,
                 };
 
                 hprintln!("{:?}", test_result);
@@ -164,10 +185,16 @@ fn main() -> ! {
     let mut test_runner = testing::Runner::new();
 
     test_runner
-        .test("Passing test")
+        .test("add(5,5) = 10")
         .assert_eq(|| add(5, 5), &10);
 
-    test_runner.test("Failing test").assert_eq(|| add(3, 3), &7);
+    test_runner
+        .test("add(3,7) != 11")
+        .assert_neq(|| add(3, 7), &11);
+
+    test_runner
+        .test("add(3,3) == 7")
+        .assert_eq(|| add(3, 3), &7);
 
     let _test_results = test_runner.run();
 
