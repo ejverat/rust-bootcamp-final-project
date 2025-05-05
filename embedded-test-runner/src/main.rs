@@ -31,12 +31,26 @@ pub mod testing {
         expected: String,
     }
 
-    #[derive(Debug)]
     pub struct TestResult {
         title: String,
         test_result: String,
         expected: String,
         passed: bool,
+    }
+
+    impl Debug for TestResult {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            let result_str = if self.passed {
+                "PASSED".to_owned()
+            } else {
+                "FAILED".to_owned()
+            };
+            write!(
+                f,
+                "{}: {}\n  EXPECTED: {}\n  RESULT:   {}",
+                result_str, &self.title, &self.expected, &self.test_result
+            )
+        }
     }
 
     pub struct Runner {
@@ -90,6 +104,7 @@ pub mod testing {
                     passed: t.expected == result,
                 };
 
+                hprintln!("{:?}", test_result);
                 tests_results.push(test_result);
             }
 
@@ -154,9 +169,9 @@ fn main() -> ! {
 
     test_runner.test("Failing test").assert_eq(|| add(3, 3), &7);
 
-    let test_results = test_runner.run();
+    let _test_results = test_runner.run();
 
-    testing::report_test(&test_results);
+    // testing::report_test(&test_results);
 
     debug::exit(debug::EXIT_SUCCESS);
 
