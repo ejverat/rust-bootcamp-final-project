@@ -71,7 +71,6 @@ pub mod testing {
 
     pub trait ExecutableTest {
         fn execute(&mut self);
-        /// .
         fn assert<F: Fn() -> bool + 'static>(&mut self, f: F);
         fn get_result(&self) -> bool;
     }
@@ -107,7 +106,7 @@ pub mod testing {
     }
 
     pub struct Runner {
-        tests: Vec<Rc<RefCell<TestItem>>>,
+        tests: Vec<TestItem>,
     }
 
     impl Runner {
@@ -115,19 +114,19 @@ pub mod testing {
             Self { tests: Vec::new() }
         }
 
-        pub fn test(&mut self, title: &str) -> Rc<RefCell<TestItem>> {
-            let new_test = Rc::new(RefCell::new(TestItem {
+        pub fn test(&mut self, title: &str) -> &mut TestItem {
+            let new_test = TestItem {
                 title: title.to_owned(),
                 function: Box::new(|| false),
                 passed: false,
-            }));
-            self.tests.push(new_test.clone());
-            new_test
+            };
+            self.tests.push(new_test);
+            self.tests.last_mut().unwrap()
         }
 
         pub fn run(&mut self) {
-            for t in self.tests.clone() {
-                t.borrow_mut().execute();
+            for t in &mut self.tests {
+                t.execute();
                 hprintln!("{:?}", t);
             }
         }
@@ -152,13 +151,13 @@ fn main() -> ! {
 
     let mut test_runner = testing::Runner::new();
 
-    test_runner.test("First").borrow_mut().assert(|| {
+    test_runner.test("First").assert(|| {
         hprintln!("Inside closure");
 
         6 == 5
     });
 
-    test_runner.test("Second").borrow_mut().assert(|| {
+    test_runner.test("Second").assert(|| {
         hprintln!("Inside second closure");
         true
     });
