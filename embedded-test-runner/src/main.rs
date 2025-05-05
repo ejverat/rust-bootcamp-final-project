@@ -40,16 +40,15 @@ pub mod testing {
 
     impl Debug for TestResult {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            let result_str = if self.passed {
-                "PASSED".to_owned()
+            if self.passed {
+                write!(f, "{}: PASSED  ", &self.title)
             } else {
-                "FAILED".to_owned()
-            };
-            write!(
-                f,
-                "{}: {}\n  EXPECTED: {}\n  RESULT:   {}",
-                result_str, &self.title, &self.expected, &self.test_result
-            )
+                write!(
+                    f,
+                    "{}: FAILED\n  EXPECTED: {}\n  RESULT:   {}",
+                    &self.title, &self.expected, &self.test_result
+                )
+            }
         }
     }
 
