@@ -52,17 +52,17 @@ pub mod testing {
             }
         }
 
-        pub fn assert<F, G, T>(&mut self, f: F, validator: G, value: &'static T)
+        pub fn assert<F, G, T>(&mut self, f: F, validator: G, value: T)
         where
             F: Fn() -> T + 'static,
-            G: Fn(&T, &T) -> bool + 'static,
-            T: Debug + PartialEq,
+            G: Fn(T, T) -> bool + 'static,
+            T: Debug + PartialEq + Copy + 'static,
         {
             let test_info = TestInfo {
                 title: self.title.to_owned(),
                 function: Box::new(move || {
                     let result = f();
-                    let compare_result = validator(&result, value);
+                    let compare_result = validator(result, value);
                     (format!("{:?}", result), compare_result)
                 }),
                 expected: format!("{:?}", value),
@@ -70,18 +70,18 @@ pub mod testing {
             self.runner.tests.push(test_info);
         }
 
-        pub fn assert_eq<F, T>(&mut self, f: F, value: &'static T)
+        pub fn assert_eq<F, T>(&mut self, f: F, value: T)
         where
             F: Fn() -> T + 'static,
-            T: Debug + PartialEq,
+            T: Debug + PartialEq + Copy + 'static,
         {
             self.assert(f, |x, y| x == y, value);
         }
 
-        pub fn assert_neq<F, T>(&mut self, f: F, value: &'static T)
+        pub fn assert_neq<F, T>(&mut self, f: F, value: T)
         where
             F: Fn() -> T + 'static,
-            T: Debug + PartialEq,
+            T: Debug + PartialEq + Copy + 'static,
         {
             self.assert(f, |x, y| x != y, value);
         }

@@ -3,6 +3,7 @@
 
 use core::mem::MaybeUninit;
 
+use alloc::format;
 // pick a panicking behavior
 use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
                      // use panic_abort as _; // requires nightly
@@ -28,7 +29,7 @@ fn add(a: i32, b: i32) -> i32 {
 #[entry]
 fn main() -> ! {
     {
-        const HEAP_SIZE: usize = 4 * 1024;
+        const HEAP_SIZE: usize = 32 * 1024;
 
         static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
         unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
@@ -37,17 +38,18 @@ fn main() -> ! {
 
     let mut test_runner = testing::Runner::new();
 
-    test_runner
-        .test("add(5,5) = 10")
-        .assert_eq(|| add(5, 5), &10);
+    for i in 0..50 {
+        let x = i;
+        let y = 2 * i;
+        let valid_result = x + y;
+        test_runner
+            .test(format!("add({},{}) = {}", x, y, valid_result).as_str())
+            .assert_eq(move || add(x, y), valid_result);
 
-    test_runner
-        .test("add(3,7) != 11")
-        .assert_neq(|| add(3, 7), &11);
-
-    test_runner
-        .test("add(3,3) == 7")
-        .assert_eq(|| add(3, 3), &7);
+        test_runner
+            .test(format!("add({},{}) != {}", x, y, valid_result).as_str())
+            .assert_neq(move || add(x, y), valid_result);
+    }
 
     let _test_results = test_runner.run();
 
